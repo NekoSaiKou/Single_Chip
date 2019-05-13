@@ -328,7 +328,7 @@ void loop() {
                     }
                     int group = divide_angle/45;
                     play(group);
-                    Serial.print("Group  ")
+                    Serial.print("Group  ");
                     Serial.println(group);                 
                 }
             }
