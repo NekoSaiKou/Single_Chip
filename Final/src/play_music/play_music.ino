@@ -287,7 +287,7 @@ void loop() {
             state_count++;
         }
         /* If acceleration is large enough than detect motion */
-        else if(aa_total >= 2000){             
+        else if(aa_total >= 3000){             
             /* If idling and sense an accelleration then go to accelerate state */
             if(state == idle){
               Serial.println("Acceleration detected");
