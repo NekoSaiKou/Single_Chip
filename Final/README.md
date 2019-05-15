@@ -6,11 +6,16 @@
 ### Platform  
 *   Arduino
 *   MPU6050
+*   HC-05
 
 ### Prototype
 *   Buzzer and arduino tone library
+*   Bluetooth communicate by Software serial
+*   MPU6050 DMP Library
 
 ### User Guide
+About 15 sconds initialization time is required
+#### Operation
 *   C --swing left
 *   D --swing top left
 *   E --swing top
@@ -19,3 +24,6 @@
 *   A --swing bottom right
 *   B --swing bottom
 *   C --swing bottom left
+
+#### Bluetooth
+*   Name : MusicStick
