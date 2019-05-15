@@ -3,6 +3,8 @@
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
 #endif
+#include  <SoftwareSerial.h>
+SoftwareSerial BTSerial(10, 11); // RX 、 TX
 
 MPU6050 mpu;
 //MPU6050 mpu(0x69); // <-- use for AD0 high
@@ -82,6 +84,9 @@ void setup() {
 
     // Serial open
     Serial.begin(115200);
+    //Bluetooth serial open
+    BTSerial.begin(57600); 
+    
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
     // initialize device
     Serial.println(F("Initializing I2C devices..."));
@@ -198,6 +203,12 @@ void mpu_wait(){
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 void loop() {
+  if (BTSerial.available())
+  Serial.write(BTSerial.read());
+// Keep reading from Arduino Serial Monitor and send to HC-05
+if (Serial.available())
+   BTSerial.write(Serial.read());
+
     // indicate start
     digitalWrite(LED_PIN,HIGH);
     
@@ -327,6 +338,8 @@ void loop() {
                       divide_angle = divide_angle - 360;
                     }
                     int group = divide_angle/45;
+                    char send_group = group + '0';
+                    BTSerial.write(send_group);
                     play(group);
                     Serial.print("Group  ");
                     Serial.println(group);                 
