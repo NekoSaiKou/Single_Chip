@@ -27,3 +27,7 @@ About 15 sconds initialization time is required
 
 #### Bluetooth
 *   Name : MusicStick
+*   Name : MusicStick2
+*   Name : MusicStick3
+
+*   PSWD : 1234
