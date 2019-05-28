@@ -15,7 +15,7 @@ MPU6050 mpu;
 
 // uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
 // components with gravity removed.
-//#define OUTPUT_READABLE_REALACCEL
+#define OUTPUT_READABLE_REALACCEL
 
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
@@ -51,7 +51,7 @@ long Z_ave = 0;
 #define Re  587
 #define Mi  659
 #define Fa  698
-#define So  784
+#define So  1568
 #define La  880
 #define Si  988
 #define Doh 1046
@@ -85,7 +85,7 @@ void setup() {
     // Serial open
     Serial.begin(115200);
     //Bluetooth serial open
-    BTSerial.begin(57600); 
+    BTSerial.begin(9600); 
     
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
     // initialize device
@@ -102,12 +102,6 @@ void setup() {
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
-
-    // supply your own gyro offsets here, scaled for min sensitivity
-    //mpu.setXGyroOffset(220);
-    //mpu.setYGyroOffset(76);
-    //mpu.setZGyroOffset(-85);
-    //mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
@@ -136,7 +130,7 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN,LOW);
     //wait mpu
-    mpu_wait();
+//    mpu_wait();
     // configure LED for output
     
 }
@@ -203,11 +197,11 @@ void mpu_wait(){
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 void loop() {
-  if (BTSerial.available())
-  Serial.write(BTSerial.read());
+    if (BTSerial.available())
+      Serial.write(BTSerial.read());
 // Keep reading from Arduino Serial Monitor and send to HC-05
-if (Serial.available())
-   BTSerial.write(Serial.read());
+    if (Serial.available())
+      BTSerial.write(Serial.read());
 
     // indicate start
     digitalWrite(LED_PIN,HIGH);
@@ -243,7 +237,8 @@ if (Serial.available())
         Serial.println(F("FIFO overflow!"));
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
-    } else if (mpuIntStatus & _BV(MPU6050_INTERRUPT_DMP_INT_BIT)) {
+    } 
+    else if (mpuIntStatus & _BV(MPU6050_INTERRUPT_DMP_INT_BIT)) {
         // wait for correct available data length, should be a VERY short wait
         while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
@@ -365,6 +360,7 @@ if (Serial.available())
             }
         }
     }
+    else{}
 }
 // ================================================================
 // ===                    Play tone                             ===
@@ -373,4 +369,3 @@ void play(int group){
     buzz_time = millis();
     tone(buzzer, melody[group]);
 }
-
