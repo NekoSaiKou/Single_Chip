@@ -66,7 +66,34 @@ volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin h
 void dmpDataReady() {
     mpuInterrupt = true;
 }
+void calWorldAcc() {
+  /* Acquire data from fifobuffer */
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetAccel(&aa, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+      
+  #ifdef OUTPUT_READABLE_YAWPITCHROLL
+      Serial.print("ypr\t");
+      Serial.print(ypr[0] * 180/M_PI);
+      Serial.print("\t");
+      Serial.print(ypr[1] * 180/M_PI);
+      Serial.print("\t");
+      Serial.print(ypr[2] * 180/M_PI);
+      Serial.print("\t");  
+  #endif
 
+  #ifdef OUTPUT_READABLE_REALACCEL
+      Serial.print("areal\t");
+      Serial.print(aaReal.x);
+      Serial.print("\t");
+      Serial.print(aaReal.y);
+      Serial.print("\t");
+      Serial.print(aaReal.z);
+      Serial.println("\t");   
+  #endif
+}
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
@@ -176,11 +203,14 @@ void mpu_wait(){
             // track FIFO count here in case there is > 1 packet available
             // (this lets us immediately read more without waiting for an interrupt)
             fifoCount -= packetSize;
-            
+
+            calWorldAcc();
+            /*
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetAccel(&aa, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+            */
             if(loopcount >1000){
                 if(abs(aaReal.x) < 200 && abs(aaReal.y) < 200 && abs(aaReal.z) < 200){
                   break;
@@ -197,9 +227,12 @@ void mpu_wait(){
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 void loop() {
+  /*
+   * For debug, able to get Serial and BlurTooth to work
+   */
     if (BTSerial.available())
       Serial.write(BTSerial.read());
-// Keep reading from Arduino Serial Monitor and send to HC-05
+    // Keep reading from Arduino Serial Monitor and send to HC-05
     if (Serial.available())
       BTSerial.write(Serial.read());
 
@@ -250,6 +283,8 @@ void loop() {
         fifoCount -= packetSize;
 
         /* Acquire data from fifobuffer */
+        calWorldAcc();
+        /*
         mpu.dmpGetQuaternion(&q, fifoBuffer);
         mpu.dmpGetAccel(&aa, fifoBuffer);
         mpu.dmpGetGravity(&gravity, &q);
@@ -275,7 +310,7 @@ void loop() {
             Serial.print(aaReal.z);
             Serial.println("\t");   
         #endif
-
+        */
         /* Calculate acceleration */
         long aa_x = aaReal.x;
         //long aa_y = aaReal.y;
