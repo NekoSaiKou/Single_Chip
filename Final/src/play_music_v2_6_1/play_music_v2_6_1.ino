@@ -15,10 +15,10 @@ MPU6050 mpu;
 
 // uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
 // components with gravity removed.
-#define OUTPUT_READABLE_REALACCEL
+//#define OUTPUT_READABLE_REALACCEL
 
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
-#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
+//#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
 // MPU control/status vars
@@ -38,11 +38,11 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 VectorInt16 last_aaReal;// [x, y, z]            use to store the last acc state
 
 // Pose vars
-#define idle  0
-#define accel 1
-#define wait_dacce 2
-#define dacce 3
-int state = idle;
+#define IDLE  0
+#define ACCEL 1
+#define WAIT_DACCE 2
+#define DACCE 3
+int state = IDLE;
 int state_count = 0;
 long X_ave = 0;
 long Z_ave = 0;
@@ -57,16 +57,58 @@ long Z_ave = 0;
 #define Si  988
 #define Doh 1046
 int melody[8] = {Do, Re, Mi, Fa, So, La, Si, Doh};
-const int buzzer = 9;
+
+// Mapping
+#define DO  '1'
+#define RE  '2'
+#define MI  '3'
+#define FA  '4'
+#define SO  '5'
+#define LA  '6'
+#define SI  '7'
+#define DOH '8'
+uint8_t cmd_map[8] = {DO, RE, MI, FA, SO, LA, SI, DOH};
+
+#define BUZZER_PIN 9
 unsigned long buzz_time = 0;
+
+// LED vars       [R, G, B]
+const uint16_t LED_PIN[3] = { 5, 4, 3 };
+
+// Pitch vars
+#define PITCH_PIN A0
+int pitch_high=0;
+
+// Button vars
+#define BUTTON_PIN 12
+// 0 => not pressed
+// 1 => not debounced delay yet
+// 2 => pressed and debounced
+// 3 => press a long time
+//uint16_t chore_state = 0; 
+bool long_press_start = false; 
+unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+unsigned long confirmPressStart = 0; // conferm that the button has been pressed, start counting the time pressed
+unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
+unsigned long longPressThres = 300;    // the debounce time; increase if the output flickers
+bool lastButtonState = LOW;   // the previous reading from the input pin
+bool button_state = false;
+
+
+bool isChord = false;
 
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
 // ================================================================
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
+
 void dmpDataReady() {
     mpuInterrupt = true;
 }
+
+// ======================================================================
+// ===  Use value in buffer to calculate the accel related to world   ===
+// ======================================================================
 void calWorldAcc() {
   /* Acquire data from fifobuffer */
   mpu.dmpGetQuaternion(&q, fifoBuffer);
@@ -95,10 +137,59 @@ void calWorldAcc() {
       Serial.println("\t");   
   #endif
 }
+
+// ======================================================================
+// ===  Light up the LED, using different color at different status   ===
+// ===  0 => Turn off the light                                       ===
+// ===  1 => Red                                                      ===
+// ===  2 => Green                                                    ===
+// ===  3 => Blue                                                     ===
+// ===  4 => Orange                                                   ===
+// ======================================================================
+void lightLed(int color) {
+  digitalWrite(LED_PIN[0], LOW);
+  digitalWrite(LED_PIN[1], LOW);
+  digitalWrite(LED_PIN[2], LOW);
+  
+  if(color == 1) {       //  RED
+    digitalWrite(LED_PIN[0], HIGH);
+  }
+  else if(color == 2) {       //  GREEN
+    digitalWrite(LED_PIN[1], HIGH);
+  }
+  else if(color == 3) {       //  BLUE
+    digitalWrite(LED_PIN[2], HIGH);
+  }
+  else if(color == 4) {       //  YELLOW
+    digitalWrite(LED_PIN[0], HIGH);
+    digitalWrite(LED_PIN[2], HIGH);
+    digitalWrite(LED_PIN[1], HIGH);
+  }
+  else {
+    Serial.println("Error color");
+  }
+}
+
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 void setup() {
+    // Use Pin 13 as 5v power supply
+    pinMode(13, OUTPUT);
+    digitalWrite(13, HIGH);
+
+    // Resistance Initial
+    pinMode(PITCH_PIN, INPUT);
+    
+    // Initialize led output pin
+    pinMode(LED_PIN[0], OUTPUT);
+    pinMode(LED_PIN[1], OUTPUT);
+    pinMode(LED_PIN[2], OUTPUT);
+
+    // BUTTON_PIN Initialized
+    // Turn up red light for not ready
+    lightLed(2);
+  
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
@@ -107,14 +198,15 @@ void setup() {
         Fastwire::setup(400, true);
     #endif
 
-    // Buzzer pinout
-    pinMode(buzzer, OUTPUT);
+    // BUZZER_PIN Initialized
+    pinMode(BUZZER_PIN, OUTPUT);
+
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     // Serial open
     Serial.begin(115200);
     //Bluetooth serial open
     BTSerial.begin(9600); 
-    
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
     // initialize device
     Serial.println(F("Initializing I2C devices..."));
@@ -155,13 +247,13 @@ void setup() {
         Serial.print(devStatus);
         Serial.println(F(")"));
     }
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN,LOW);
+
     //wait mpu
     mpu_wait();
     // configure LED for output
-    
+    lightLed(3);
 }
+
 // ================================================================
 // ===                    Wait for mpu stable                   ===
 // ================================================================
@@ -204,14 +296,9 @@ void mpu_wait(){
             // track FIFO count here in case there is > 1 packet available
             // (this lets us immediately read more without waiting for an interrupt)
             fifoCount -= packetSize;
-
+            // Acquire data from fifobuffer
             calWorldAcc();
-            /*
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            */
+            
             if(loopcount >1000){
                 if(abs(aaReal.x) < 200 && abs(aaReal.y) < 200 && abs(aaReal.z) < 200){
                   break;
@@ -224,6 +311,82 @@ void mpu_wait(){
         loopcount++;
     }
 }
+
+// ================================================================
+// ===                 Judge which pitch is now                 ===
+// ================================================================
+int judgePitch() {
+  int reading = analogRead(PITCH_PIN);
+  if(reading < 250) {
+    return 8;
+  }
+  else if(reading > 750) {
+    return 10; 
+  }
+  else {
+    return 9;
+  }
+}
+
+// ================================================================
+// ===          Judge if the button is hit, with debounce       ===
+// ================================================================
+void buttonHit() {
+  // read the state of the switch into a local variable:
+  bool reading = digitalRead(BUTTON_PIN);
+  reading = !reading; // inverse, for using input pullup
+
+  // check to see if you just pressed the button
+  // (i.e. the input went from LOW to HIGH), and you've waited long enough
+  // since the last press to ignore any noise:
+
+  // If the switch changed, due to noise or pressing:
+  if (reading != lastButtonState) {
+    // reset the debouncing timer
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    // Debounce finished, able to do the judgement
+    button_state = reading;
+  }
+  
+  // save the reading. Next time through the loop, it'll be the lastButtonState:
+  lastButtonState = reading;
+}
+
+// ================================================================
+// ===         Use button state to judge the chore state        ===
+// ================================================================
+void pressState() {
+  // run button status
+  buttonHit();
+//  Serial.print(millis() - confirmPressStart);
+  // If the button is pressed and is the first time pressed 
+  if(button_state && !long_press_start) {
+    confirmPressStart = millis();
+    long_press_start = true;
+    lightLed(1);
+    Serial.println("Long press start");
+  }
+  // If the button is released immediately
+  else if(!button_state && long_press_start && ((millis() - confirmPressStart) < longPressThres) ) {
+    isChord = !isChord;
+    long_press_start = false;
+    Serial.println("It's a short press");
+    if(isChord)
+      BTSerial.write("11");
+    else
+      BTSerial.write("12");
+//    delay(1000);
+    lightLed(3);
+  }
+  else if(!button_state){
+    long_press_start = false;
+    lightLed(3);
+  }
+}
+
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
@@ -238,16 +401,51 @@ void loop() {
       BTSerial.write(Serial.read());
 
     // indicate start
-    digitalWrite(LED_PIN,HIGH);
+//    digitalWrite(LED_PIN,HIGH);
     
     // If buzz buzzing for 500ms then stop
     if(millis() - buzz_time > 500){
-      noTone(buzzer);
+      noTone(BUZZER_PIN);
     }
   
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
 
+
+    /***************************************************
+     *                                                 *
+     *                Get button status                *
+     *                                                 *
+     ***************************************************/
+    pressState();
+//    Serial.print("Chord: ");
+//    Serial.print(isChord);
+//    Serial.print("long_press_start");
+//    Serial.println(long_press_start);
+    /***************************************************
+     *                                                 *
+     *            Get resistance status                *
+     *                                                 *
+     ***************************************************/
+    int tmp_pitch = judgePitch();
+    if(tmp_pitch != pitch_high) {
+      pitch_high = tmp_pitch;
+      if(pitch_high < 10)
+        BTSerial.write( pitch_high+'0' );
+      else if(pitch_high == 10 ) 
+        BTSerial.write( "10" );
+      else{}
+//      Serial.print(analogRead(A0));
+//      Serial.print("pitch_high: ");
+//      Serial.println(pitch_high);
+//      delay(1000);
+    }
+
+    /***************************************************
+     *                                                 *
+     *                  Get MPU status                 *
+     *                                                 *
+     ***************************************************/
     // wait for MPU interrupt or extra packet(s) available
     while (!mpuInterrupt && fifoCount < packetSize) {
         if (mpuInterrupt && fifoCount < packetSize) {
@@ -285,34 +483,7 @@ void loop() {
 
         /* Acquire data from fifobuffer */
         calWorldAcc();
-        /*
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetAccel(&aa, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-            
-        #ifdef OUTPUT_READABLE_YAWPITCHROLL
-            Serial.print("ypr\t");
-            Serial.print(ypr[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(ypr[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(ypr[2] * 180/M_PI);
-            Serial.print("\t");  
-        #endif
-
-        #ifdef OUTPUT_READABLE_REALACCEL
-            Serial.print("areal\t");
-            Serial.print(aaReal.x);
-            Serial.print("\t");
-            Serial.print(aaReal.y);
-            Serial.print("\t");
-            Serial.print(aaReal.z);
-            Serial.println("\t");   
-        #endif
-        */
-        
+                
         /* Calculate acceleration */
         long aa_x = aaReal.x;
         //long aa_y = aaReal.y;
@@ -321,23 +492,23 @@ void loop() {
         
         /* If the force isn't large enough then skip this procedure */
         /* Usually, deacceleration value is smaller than acceleration */
-        if(aa_total >= 800 && state == wait_dacce){
+        if(aa_total >= 800 && state == WAIT_DACCE){
             Serial.print("Deacceleration detected  ");
             Serial.println(state_count);
             if(state_count == 4){
-              state = dacce;  
+              state = DACCE;  
             }
             state_count++;
         }
         /* If acceleration is large enough than detect motion */
         else if(aa_total >= 3000){             
             /* If idling and sense an accelleration then go to accelerate state */
-            if(state == idle){
+            if(state == IDLE){
               Serial.println("Acceleration detected");
-              state = accel;
+              state = ACCEL;
             }
             /* Record several accel state acceleration data and its moving average */
-            if(state == accel){
+            if(state == ACCEL){
                 /* Get five samples of acceleration */
                 if(state_count <4){
                     X_ave = X_ave + aa_x;
@@ -345,7 +516,7 @@ void loop() {
                     state_count++;
                 }
                 /* After getting 4 sample then calculate average and obtain groups */
-                else if(state_count == 4){
+                else if(state_count == 4 && !long_press_start){
                     state_count++;
                     X_ave = X_ave/state_count;
                     Z_ave = Z_ave/state_count;
@@ -371,7 +542,8 @@ void loop() {
                     }
                     int group = divide_angle/45;
                     char send_group = group + '0';
-                    BTSerial.write(send_group);
+//                    BTSerial.write(send_group);     
+                    BTSerial.write(cmd_map[group]);     // Send the command after mapping
                     play(group);
                     Serial.print("Group  ");
                     Serial.println(group);                 
@@ -383,26 +555,27 @@ void loop() {
         If acceleration isn't that big but previous state is deacceleration, then a cycle finish --idle.
         */
         else{
-            if(state == accel){
+            if(state == ACCEL){
                 Serial.println("go wait deacceleration");
-                state = wait_dacce;
+                state = WAIT_DACCE;
                 state_count = 0;
                 X_ave = 0;
                 Z_ave = 0;
             }
-            if(state == dacce){
+            if(state == DACCE){
                 Serial.println("After deacceleration go idle");
-                state = idle;
+                state = IDLE;
                 state_count = 0;
             }
         }
     }
     else{}
 }
+
 // ================================================================
 // ===                    Play tone                             ===
 // ================================================================
 void play(int group){
     buzz_time = millis();
-    tone(buzzer, melody[group]);
+    tone(BUZZER_PIN, melody[group]);
 }
