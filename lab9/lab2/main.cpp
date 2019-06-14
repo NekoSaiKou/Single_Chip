@@ -10,7 +10,6 @@ typedef struct {
   uint32_t minute;  /* minute               */
   uint32_t second;  /* second               */
 } mail_t;
- 
 Mail<mail_t, 16> mail_box;
 
 int get_day(int m, int y){
@@ -19,16 +18,10 @@ int get_day(int m, int y){
     }
     else{
         if(m == 2){
-            if((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0 && y % 3200 != 0)){
-                return 29;
-            }
-            else{
-                return 28;
-            }
+            if((y % 4 == 0 && y % 100 != 0) || (y % 400 == 0 && y % 3200 != 0)) return 29;
+            else return 28;
         }
-        else{
-            return (m%2==1)?31:30;
-        }
+        else return (m%2==1)?31:30;
     }
 }
 
