@@ -94,7 +94,7 @@ bool long_press_start = false;
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long confirmPressStart = 0; // conferm that the button has been pressed, start counting the time pressed
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
-unsigned long longPressThres = 300;    // the debounce time; increase if the output flickers
+unsigned long longPressThres = 600;    // the debounce time; increase if the output flickers
 bool lastButtonState = LOW;   // the previous reading from the input pin
 bool button_state = false;
 
@@ -321,10 +321,10 @@ void mpu_wait(){
 // ================================================================
 int judgePitch() {
   int reading = analogRead(PITCH_PIN);
-  if(reading < 250) {
+  if(reading < 555) {
     return 8;
   }
-  else if(reading > 750) {
+  else if(reading > 780) {
     return 10; 
   }
   else {

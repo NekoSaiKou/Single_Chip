@@ -42,12 +42,14 @@ VectorInt16 last_aaReal;// [x, y, z]            use to store the last acc state
 #define ACCEL 1
 #define WAIT_DACCE 2
 #define DACCE 3
+#define SAM_SIZE 6
 int state = IDLE;
 int state_count = 0;
 int dacc_thres = 800;
 int acc_thres = 3000;
-long X_ave = 0;
-long Z_ave = 0;
+int X_max = 0;
+int Z_max = 0;
+long int X_Z_max = 0;
 
 // Melody vars
 #define Do  523
@@ -95,6 +97,8 @@ unsigned long debounceDelay = 50;    // the debounce time; increase if the outpu
 unsigned long longPressThres = 600;    // the debounce time; increase if the output flickers
 bool lastButtonState = LOW;   // the previous reading from the input pin
 bool button_state = false;
+uint16_t send_count = 0;
+uint64_t send_timer = 0;
 
 
 bool isChord = false;
@@ -319,14 +323,10 @@ void mpu_wait(){
 // ================================================================
 int judgePitch() {
   int reading = analogRead(PITCH_PIN);
-//  Serial.print("reading:  ");
-//  Serial.print(reading);
-//  Serial.print("  ");
-  
-  if(reading < 555) {
+  if(reading < 450) {
     return 8;
   }
-  else if(reading > 780) {
+  else if(reading > 800) {
     return 10; 
   }
   else {
@@ -436,15 +436,19 @@ void loop() {
     int tmp_pitch = judgePitch();
     if(tmp_pitch != pitch_high) {
       pitch_high = tmp_pitch;
-      if(pitch_high < 10)
-        BTSerial.write( pitch_high+'0' );
-      else if(pitch_high == 10 ) 
-        BTSerial.write( "10" );
-      else{}
-//      Serial.print(analogRead(A0));
-//      Serial.print("pitch_high: ");
-//      Serial.println(pitch_high);
-//      delay(1000);
+      send_count = 3;
+      send_timer = millis();
+    }
+    if(send_count != 0) {
+      if( (millis() - send_timer) > 80) {
+        send_timer = millis();
+        send_count--;
+        if(pitch_high < 10)
+          BTSerial.write( pitch_high+'0' );
+        else if(pitch_high == 10 ) 
+          BTSerial.write( "10" );
+        else{}
+      }
     }
 
     /***************************************************
@@ -519,20 +523,27 @@ void loop() {
             /* Record several accel state acceleration data and its moving average */
             if(state == ACCEL){
                 /* Get five samples of acceleration */
-                if(state_count <4){
-                    X_ave = X_ave + aa_x;
-                    Z_ave = Z_ave + aa_z;
+                if(state_count < SAM_SIZE){
+                    /* Calculate swing acceleration */
+                    if(aa_total > X_Z_max) {
+                      X_max = aaReal.x;
+                      Z_max = aaReal.z;
+                      X_Z_max = aa_total;
+                    }
                     state_count++;
                 }
                 /* After getting 4 sample then calculate average and obtain groups */
-                else if(state_count == 4 && !long_press_start){
+                else if(state_count == SAM_SIZE && !long_press_start){
+                    
+                    Serial.print("  X_Z_max: ");
+                    Serial.print(X_Z_max);
+                    Serial.print("\t");
+                    Serial.print("  X_max: ");
+                    Serial.print(X_max);
+                    Serial.print("\t");
                     state_count++;
-                    X_ave = X_ave/state_count;
-                    Z_ave = Z_ave/state_count;
-                    /* Calculate swing acceleration */
-                    long x_z = sqrt( X_ave*X_ave + Z_ave*Z_ave); 
                     /* Calculate force angle relative to sensor and map to 360 degree */
-                    int angle = acos(float(X_ave)/x_z)*180/M_PI;
+                    int angle = acos(float(X_max)/X_Z_max)*180/M_PI;
                     if(aa_z <0){
                         angle = 360-angle;
                     }
@@ -571,13 +582,15 @@ void loop() {
                 Serial.println("go wait deacceleration");
                 state = WAIT_DACCE;
                 state_count = 0;
-                X_ave = 0;
-                Z_ave = 0;
+                X_max = 0;
+                Z_max = 0;
+                X_Z_max = 0;
             }
             if(state == DACCE){
                 Serial.println("After deacceleration go idle");
                 state = IDLE;
                 state_count = 0;
+                X_Z_max = 0;
             }
         }
     }
@@ -590,5 +603,5 @@ void loop() {
 // ================================================================
 void play(int group){
     buzz_time = millis();
-    tone(BUZZER_PIN, melody[cmd_map[group]-'0']);
+    tone(BUZZER_PIN, melody[(int)(cmd_map[group]-'0')]);
 }
