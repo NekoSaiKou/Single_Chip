@@ -54,8 +54,6 @@ void lightUp(void const *led) {
             Thread::wait(500);
             one_slots.release();
         }
-        else {}      
-//        mut.unlock();
         LEDs[(int)(int*)led] = 0;
     }
 }
@@ -68,13 +66,6 @@ void hitButn() {
             mut.lock();
             button_hit = !button_hit;
             mut.unlock();
-            
-            //two_slots.release();
-//            one_slots.release();
-//            wait_ms(500);
-//            LEDs[0] = 0;
-//            LEDs[1] = 0;
-//            LEDs[2] = 0;
         }
     }
 }
@@ -98,10 +89,6 @@ int main(void) {
     printf("led_3 Thread Initialized\n\r");
     
     printf("Thread Initialized\n\r");
-    
-//    led_1_timer.start(500);
-//    led_2_timer.start(500);
-//    led_3_timer.start(500);
-    
+
     Thread::wait(osWaitForever);
 }
