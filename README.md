@@ -19,3 +19,7 @@ This is the 2019 single chip course source code repo. The repo contains all sour
 ## README
 
 The README file in each folder is the description of each corresponding lab. And the [Introduction.md](./Introduction.md) file in this repo is the introduction of the Single Chip System Design and Application course.
+
+# Importance
+
+The course dscription file is in format of HACKMD and the image in each file might be no longer available for some days.
