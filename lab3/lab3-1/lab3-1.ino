@@ -1,9 +1,9 @@
-#include  <SoftwareSerial.h>
-SoftwareSerial BTSerial(10, 11); // RX 、 TX
+//#include  <SoftwareSerial.h>
+//SoftwareSerial BTSerial(10, 11); // RX 、 TX
 void setup()
 {
   Serial.begin(9600);
-  BTSerial.begin(9600);  // HC-05 baudrate, match serial in order to print correctly
+  Serial1.begin(9600);  // HC-05 baudrate, match serial in order to print correctly
   pinMode(5, OUTPUT);    // Set the led pin mode
   digitalWrite(5, LOW);
 }
